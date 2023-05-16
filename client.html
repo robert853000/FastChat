@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Testování WebSocket</title>
+    <script>
+
+        var socket = new WebSocket("wss://localhost:555"); // Upravte adresu a port podle potřeby
+
+        socket.onopen = function () {
+            console.log("WebSocket spojení bylo úspěšně navázáno.");
+            const username = prompt("Zadejte své jméno:");
+
+            if (username) {
+                const message = {
+                    command: "setUsername",
+                    username: username
+                };
+
+                socket.send(JSON.stringify(message));
+                document.getElementById("usernameLbl").innerText = username; // Ošetření jako innerHTML
+            }
+
+            // Zde můžete provést další akce po úspěšném navázání spojení
+        };
+
+        socket.onmessage = function (event) {
+            let message;
+            try {
+                message = JSON.parse(event.data);
+            } catch (error) {
+                console.log('Chyba při parsování zprávy jako JSON:', event.data);
+                return;
+            }
+
+
+            console.log("Přijata zpráva: " + event.data);
+
+            if (message.command === 'updateClients') {
+                const clients = message.clients;
+                // Zde provedete aktualizaci seznamu připojených klientů na základě přijatých informací
+                console.log('Aktualizace seznamu připojených klientů:', clients);
+
+                // Aktualizace selectu clientIdSelect
+                const select = document.getElementById('clientIdSelect');
+                select.innerHTML = '';
+                const userListDiv = document.getElementById('userList');
+                userListDiv.innerHTML = ''; // Vymaže předchozí obsah
+
+                clients.forEach(client => {
+                    const option = document.createElement('option');
+                    option.text = `${client.name} (${client.id})`;
+                    option.value = client.id;
+                    select.appendChild(option);
+
+                    const clientInfo = document.createElement('p');
+                    clientInfo.style.margin = '5px';
+                    clientInfo.textContent = `${client.id} - ${client.name}`;
+
+                    userListDiv.appendChild(clientInfo);
+                });
+
+            } else if (message.command === 'publicMessage') {
+                const chatMessage = document.getElementById('chatMessage');
+                const senderName = message.senderName;
+                const senderID = message.senderID;
+                const senderIP = message.senderIP;
+                const messageText = message.message;
+
+                const currentDate = new Date();
+                const formattedTime = `${currentDate.getFullYear()}/${(currentDate.getMonth() + 1).toString().padStart(2, '0')}/${currentDate.getDate().toString().padStart(2, '0')} - ${currentDate.getHours().toString().padStart(2, '0')}:${currentDate.getMinutes().toString().padStart(2, '0')}:${currentDate.getSeconds().toString().padStart(2, '0')}`;
+
+                const formattedMessage = `${formattedTime} - ${senderName} (${senderID}, ${senderIP}): ${messageText}\n`;
+                chatMessage.innerHTML += formattedMessage;
+
+
+                chatMessage.scrollTop = chatMessage.scrollHeight;
+
+            } else if (message.command === 'privateMessage') {
+                const chatMessage = document.getElementById('chatMessage');
+                const senderName = message.senderName;
+                const recipientName = message.recipientName;
+                const senderID = message.senderID;
+                const senderIP = message.senderIP;
+                const messageText = message.message;
+
+                const currentDate = new Date();
+                const formattedTime = `${currentDate.getFullYear()}/${(currentDate.getMonth() + 1).toString().padStart(2, '0')}/${currentDate.getDate().toString().padStart(2, '0')} - ${currentDate.getHours().toString().padStart(2, '0')}:${currentDate.getMinutes().toString().padStart(2, '0')}:${currentDate.getSeconds().toString().padStart(2, '0')}`;
+
+                const formattedMessage = `${formattedTime} - soukromá zpráva od ${senderName}->${recipientName} (${senderID}, ${senderIP}): ${messageText}\n`;
+                chatMessage.innerHTML += formattedMessage;
+
+
+                chatMessage.scrollTop = chatMessage.scrollHeight;
+
+            } else if (message.command === 'systemMessage') {
+                const chatMessage = document.getElementById('chatMessage');
+                const senderName = message.senderName;
+                const senderID = message.senderID;
+
+                const messageText = message.message;
+
+                const currentDate = new Date();
+                const formattedTime = `${currentDate.getFullYear()}/${(currentDate.getMonth() + 1).toString().padStart(2, '0')}/${currentDate.getDate().toString().padStart(2, '0')} - ${currentDate.getHours().toString().padStart(2, '0')}:${currentDate.getMinutes().toString().padStart(2, '0')}:${currentDate.getSeconds().toString().padStart(2, '0')}`;
+
+                const formattedMessage = `********** ${formattedTime} ${senderName} : ${messageText}\n`;
+                chatMessage.innerHTML += formattedMessage;
+
+
+                chatMessage.scrollTop = chatMessage.scrollHeight;
+
+            } else {
+                // Zde zpracujte ostatní příkazy, které klient dokáže pochopit
+                console.log('Přijatá zpráva:', message);
+            }
+        };
+
+        socket.onclose = function (event) {
+            console.log("WebSocket spojení bylo uzavřeno.");
+            // Zde můžete provést další akce po uzavření spojení
+        };
+
+        function sendWebSocketMessage() {
+            var select = document.getElementById("commandSelect");
+            var command = select.value;
+            var messageText = document.getElementById("messageText").value;
+            var message = {};
+
+            if (command === "privateMessage") {
+                var selectedId = document.getElementById("clientIdSelect").value;
+                message = {
+                    command: command,
+                    recipientID: selectedId,
+                    message: messageText
+                };
+            } else if (command === "requestConnectedClients") {
+                message = {
+                    command: command
+                };
+            } else if (command === "broadcastMessage") {
+                message = {
+                    command: command,
+                    message: messageText
+                };
+            } else {
+                console.log("Neplatný příkaz");
+                return;
+            }
+
+            socket.send(JSON.stringify(message));
+            console.log("Odeslána zpráva: ", message);
+            // Zde můžete provést další akce při odeslání zprávy
+
+            document.getElementById("messageText").value = "";
+        }
+
+        function handleCommandSelectChange() {
+            var select = document.getElementById("commandSelect");
+            var messageText = document.getElementById("messageText");
+            var clientIdSelect = document.getElementById("clientIdSelect");
+
+            if (select.value === "broadcastMessage") {
+                messageText.style.display = "inline-block";
+                clientIdSelect.style.display = "none";
+            } else if (select.value === "privateMessage") {
+                messageText.style.display = "inline-block";
+                clientIdSelect.style.display = "inline-block";
+            } else {
+                messageText.style.display = "none";
+                clientIdSelect.style.display = "none";
+            }
+        }
+
+
+    </script>
+</head>
+
+<body style="background-color: #07203b;">
+    <h1 style="color: white;">Interaktivní chat místnost</h1>
+    <div style="display: flex; justify-content: space-between;position: fixed; bottom: 50px; left:35px;width:70vw;">
+        <div style="flex: 1; " id="usernameLbl">Username:</div>
+        <div style="flex: 4; padding-right: 10px; ">
+            <input type="text" id="messageText" placeholder="Zpráva"
+                style="background-color: #0c3558; color: white; width: 100%;">
+        </div>
+        <div style="flex: 1; padding-left: 10px; ">
+            <select id="commandSelect" onchange="handleCommandSelectChange()"
+                style="background-color: #0c3558; color: white; width: 100%;">
+                <option value="broadcastMessage">broadcastMessage</option>
+                <option value="requestConnectedClients">requestConnectedClients</option>
+                <option value="privateMessage">Private Message</option>
+            </select>
+        </div>
+        <div style="flex: 1; padding-left: 10px; ">
+            <select id="clientIdSelect" style="background-color: #0c3558; color: white; display: none; width: 100%;">
+                <!-- Možnosti pro výběr ID klientů -->
+            </select>
+        </div>
+        <div style="flex: 1; padding-left: 10px; text-align: left;">
+            <button onclick="sendWebSocketMessage()" style="background-color: #0c3558; color: white;">Odeslat</button>
+        </div>
+    </div>
+
+    <div id="messageRoom"
+        style="height: 80vh; background-color: #082945; color: white; padding: 10px; margin-top: 10px;display: flex;">
+        <div style="margin-top: 10px; height:70vh;width: 80%;flex:8">
+            <textarea id="chatMessage" placeholder="Text v místnosti"
+                style="width: 100%; height: 100%; background-color: #0c3558; color: white; padding: 5px;"></textarea>
+        </div>
+
+        <div style="width: 15%; padding-left: 10px; flex:2; margin: 10px;">
+            <h2 style="color: #d1d1d1; font-size: 14px;">Seznam připojených uživatelů:</h2>
+            <div id="userList" style="color: #a0a0a0;"></div>
+        </div>
+    </div>
+
+    <script>
+        handleCommandSelectChange();
+    </script>
+</body>
+
+
+</html>
